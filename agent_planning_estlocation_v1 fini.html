@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Planning — Est Location</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Charte Est Location */
+  --orange:       #f97316;
+  --orange-dark:  #e68c00;
+  --orange-deep:  #ea580c;
+  --orange-dim:   rgba(249,115,22,0.10);
+  --orange-glow:  rgba(249,115,22,0.22);
+  --orange-border:rgba(249,115,22,0.30);
+
+  /* Nuances de bleu à la place du gris */
+  --blue-50:  #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-400: #3b82f6;
+  --blue-500: #1d4ed8;
+  --blue-600: #1e40af;
+  --blue-700: #1e3a8a;
+  --blue-900: #0f172a;
+
+  /* Fonds clairs bleutés */
+  --bg:      #eff6ff;
+  --card:    #ffffff;
+  --surface: #f0f7ff;
+  --surface2:#e8f0fe;
+  --border:  rgba(30,64,175,0.12);
+  --border2: rgba(30,64,175,0.20);
+
+  /* États */
+  --success: #22c55e;
+  --success-dim:   rgba(34,197,94,0.10);
+  --success-border:rgba(34,197,94,0.25);
+  --danger:  #f43f5e;
+  --danger-dim:    rgba(244,63,94,0.10);
+  --danger-border: rgba(244,63,94,0.25);
+  --warning: #fbbf24;
+  --warning-dim:   rgba(251,191,36,0.10);
+  --warning-border:rgba(251,191,36,0.25);
+
+  /* Texte bleuté */
+  --text:   #0f172a;
+  --muted:  #93c5fd;
+  --muted2: #1e40af;
+
+  --radius: 16px;
+  --transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 10% 80%, rgba(59,130,246,0.08) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 60% at 90% 10%, rgba(249,115,22,0.05) 0%, transparent 60%),
+    linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+/* ── BARRE LOGO ───────────────────────────────── */
+.logo-bar {
+  width: 100%; max-width: 680px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; padding: 0 4px;
+  flex-wrap: wrap; gap: 8px;
+}
+.logo-left { display: flex; align-items: center; gap: 12px; }
+.logo-icon  { width: 500px; height: auto; display: flex; align-items: center; }
+.logo-text  {
+  font-size: 11px; font-weight: 600; color: var(--blue-700);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border-left: 2px solid var(--orange); padding-left: 10px;
+}
+.version-tag {
+  font-size: 10px; font-weight: 500; color: var(--blue-700);
+  background: var(--blue-100); border: 1px solid var(--blue-200);
+  padding: 3px 10px; border-radius: 20px; letter-spacing: 0.05em;
+}
+
+/* ── CARTE PRINCIPALE ─────────────────────────── */
+.app {
+  width: 100%; max-width: 680px; height: 88vh; max-height: 840px;
+  background: var(--card); border: 1px solid var(--border2); border-radius: 24px;
+  display: flex; flex-direction: column; overflow: hidden; position: relative;
+  box-shadow: 0 20px 60px rgba(37,99,235,0.10), 0 4px 16px rgba(37,99,235,0.07), 0 0 0 1px rgba(59,130,246,0.10);
+}
+/* Trait orange en haut de la carte */
+.app::before {
+  content: ''; position: absolute; top: 0; left: 8%; right: 8%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--orange-dark) 30%, var(--orange) 50%, var(--orange-dark) 70%, transparent);
+  border-radius: 0 0 4px 4px; z-index: 2;
+}
+
+/* ── HEADER ───────────────────────────────────── */
+.header {
+  padding: 18px 24px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(180deg, rgba(59,130,246,0.05) 0%, transparent 100%);
+  flex-shrink: 0;
+}
+.agent-avatar {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--orange-dim); border: 1px solid var(--orange-border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.agent-avatar svg { width: 20px; height: 20px; color: var(--orange); }
+.header-info { flex: 1; }
+.header-title {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.header-title .ia-badge {
+  font-size: 10px; font-weight: 600; color: var(--orange);
+  background: var(--orange-dim); border: 1px solid var(--orange-border);
+  padding: 1px 7px; border-radius: 20px; letter-spacing: 0.04em;
+}
+.header-sub { font-size: 11.5px; color: var(--blue-500); margin-top: 3px; font-weight: 400; }
+
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--success-dim); border: 1px solid var(--success-border);
+  border-radius: 20px; padding: 5px 12px; font-size: 11px; font-weight: 600;
+  color: var(--success); flex-shrink: 0; letter-spacing: 0.03em;
+}
+.pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+  animation: pulse 2.5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(34,197,94,0.6);
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(0.8)} }
+
+/* ── BANDEAU COMMANDES ────────────────────────── */
+.rule-banner {
+  padding: 9px 24px; background: rgba(249,115,22,0.04);
+  border-bottom: 1px solid rgba(249,115,22,0.10);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 500; color: rgba(249,115,22,0.75);
+  flex-shrink: 0; flex-wrap: wrap;
+}
+.rule-banner svg { opacity: 0.7; }
+.rule-banner code {
+  background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.22);
+  padding: 2px 8px; border-radius: 6px; font-size: 11px;
+  color: var(--orange); font-family: 'SF Mono', 'Fira Code', monospace;
+  font-weight: 600;
+}
+
+/* ── MESSAGES ─────────────────────────────────── */
+.messages {
+  flex: 1; overflow-y: auto; padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+  scrollbar-width: thin; scrollbar-color: rgba(59,130,246,0.20) transparent;
+}
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.25); border-radius: 4px; }
+
+.msg { display: flex; gap: 10px; align-items: flex-start; animation: fadeUp 0.22s ease; }
+.msg.user { flex-direction: row-reverse; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.msg-icon {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--orange-dim); border: 1px solid var(--orange-border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+}
+.msg-icon svg { width: 14px; height: 14px; color: var(--orange); }
+
+.msg-content { display: flex; flex-direction: column; gap: 4px; max-width: 82%; }
+.msg.user .msg-content { align-items: flex-end; }
+
+.bubble {
+  padding: 12px 16px; border-radius: 16px;
+  font-size: 13.5px; line-height: 1.7; color: var(--text);
+}
+.msg.bot .bubble {
+  background: var(--blue-50); border: 1px solid var(--blue-100);
+  border-top-left-radius: 4px; color: var(--text);
+}
+.msg.user .bubble {
+  background: linear-gradient(135deg, var(--orange-dark), var(--orange));
+  border: none; border-top-right-radius: 4px; color: #fff;
+  box-shadow: 0 4px 16px rgba(249,115,22,0.30);
+}
+.bubble.success {
+  background: var(--success-dim); border: 1px solid var(--success-border);
+  color: var(--success); font-weight: 500;
+}
+.bubble.error {
+  background: var(--danger-dim); border: 1px solid var(--danger-border); color: #fb7185;
+}
+.bubble.warning {
+  background: var(--warning-dim); border: 1px solid var(--warning-border); color: var(--warning);
+}
+
+.timestamp { font-size: 10px; color: var(--blue-500); padding: 0 3px; font-weight: 400; }
+
+/* ── TYPING ───────────────────────────────────── */
+.typing-dots { display: flex; gap: 5px; align-items: center; padding: 3px 0; }
+.typing-dots span {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--orange);
+  animation: bounce 1.2s ease-in-out infinite; opacity: 0.5;
+}
+.typing-dots span:nth-child(2){animation-delay:.18s}
+.typing-dots span:nth-child(3){animation-delay:.36s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+
+/* ── EXEMPLES RAPIDES ─────────────────────────── */
+.examples {
+  padding: 0 24px 14px; display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.ex-label {
+  width: 100%; font-size: 10px; font-weight: 600; color: var(--blue-600);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;
+}
+.ex-btn {
+  font-size: 11.5px; font-weight: 500; padding: 5px 13px;
+  border: 1px solid var(--blue-200); border-radius: 20px;
+  background: var(--blue-50); color: var(--blue-700); cursor: pointer;
+  transition: var(--transition);
+}
+.ex-btn:hover {
+  border-color: var(--orange-border); color: var(--orange);
+  background: var(--orange-dim);
+  transform: translateY(-1px);
+}
+
+/* ── ZONE DE SAISIE ───────────────────────────── */
+.input-area {
+  padding: 14px 20px 16px; border-top: 1px solid var(--border);
+  background: var(--surface2); display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0;
+}
+textarea {
+  flex: 1; font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 400;
+  background: var(--surface); border: 1px solid var(--border2); border-radius: 14px;
+  padding: 11px 16px; color: var(--text);
+  resize: none; min-height: 44px; max-height: 110px; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.5;
+}
+textarea:focus {
+  border-color: var(--blue-400);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+textarea::placeholder { color: var(--blue-500); opacity: 0.6; }
+
+.send-btn {
+  width: 44px; height: 44px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, var(--orange-dark), var(--orange));
+  color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: var(--transition);
+  box-shadow: 0 4px 16px rgba(249,115,22,0.35);
+}
+.send-btn svg { width: 17px; height: 17px; }
+.send-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(249,115,22,0.45); }
+.send-btn:active { transform: scale(0.95); box-shadow: none; }
+.send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── SÉPARATEUR ───────────────────────────────── */
+.day-divider {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; font-weight: 600; color: var(--blue-600);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.day-divider::before,.day-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--blue-200);
+}
+/* ── HERO ─────────────────────────────────────── */
+.hero {
+  width: 100%; max-width: 680px;
+  background: #ffffff;
+  border: 1px solid var(--blue-100);
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  box-shadow: 0 4px 24px rgba(30,58,138,0.10);
+  position: relative;
+  overflow: hidden;
+}
+/* Texture subtile */
+.hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 80% at 95% 50%, rgba(59,130,246,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+/* Trait dégradé bleu→orange en haut */
+.hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--blue-700), var(--orange));
+}
+.hero-logo {
+  flex: 0 0 30%; display: flex;
+  align-items: center; justify-content: center; z-index: 1;
+}
+.hero-content { flex: 0 0 70%; z-index: 1; padding-left: 24px; border-left: 1px solid var(--blue-100); }
+.hero-logo img {
+  width: 100%; max-width: 160px; height: auto;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.15));
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; color: var(--blue-600);
+  text-transform: uppercase; letter-spacing: 0.12em;
+  margin-bottom: 10px;
+}
+.hero-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 8px rgba(249,115,22,0.5);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.hero-title {
+  font-size: 19px; font-weight: 800; color: var(--blue-900);
+  line-height: 1.25; margin-bottom: 8px;
+}
+.hero-title span { color: var(--orange); }
+.hero-desc {
+  font-size: 12px; color: var(--muted2);
+  line-height: 1.65; margin-bottom: 14px; max-width: 360px;
+}
+.hero-tags {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.hero-tags span {
+  font-size: 11px; font-weight: 500;
+  background: var(--blue-50);
+  color: var(--blue-700);
+  border: 1px solid var(--blue-100);
+  padding: 3px 11px; border-radius: 20px;
+}
+.version-tag {
+  position: absolute; top: 14px; right: 16px; z-index: 1;
+  font-size: 10px; font-weight: 600; color: var(--blue-700);
+  background: var(--blue-50); border: 1px solid var(--blue-100);
+  padding: 3px 10px; border-radius: 20px; letter-spacing: 0.05em;
+}
+/* ── FIN HERO ─────────────────────────────────── */
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-logo">
+    <svg id="Calque_2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 101.02 95.49" style="width:100%;max-width:220px;height:auto;"><defs><style>.cls-1{fill:url(#deg126)}.cls-2{fill:url(#deg68)}.cls-3{fill:#3e3e3e}.cls-4{fill:#9f5b20}.cls-5{fill:#fdffff}.cls-6{fill:#fff}.cls-7{fill:#f1891a}.cls-8{fill:#a85221}</style><linearGradient id="deg68" x1="60.41" y1="37.15" x2="60.41" y2="81.6" gradientUnits="userSpaceOnUse"><stop offset=".47" stop-color="#f1891a"/><stop offset=".74" stop-color="#512700"/></linearGradient><linearGradient id="deg126" x1="65.9" y1="22.83" x2="65.9" y2="95.49" gradientUnits="userSpaceOnUse"><stop offset=".47" stop-color="#f1891a"/><stop offset=".93" stop-color="#512700"/></linearGradient></defs><g><path class="cls-3" d="M95.5,46.25l5.52-1.79-1.3-7.07-6.01.41-2.84-6.82,4.22-4.47-3.41-4.95-5.85,2.6-5.12-6.09,3.33-6.58-9.58-6.82-5.56,6.37-10.56-3.29-.89-7.27-12.06-.49-1.18,7.19-9.66,2.84-5.03-6.21-10.64,5.6,2.96,6.94-7.39,8.53-7.35-2.44-4.83,10.19,6.29,5.73-1.02,11.04-7.55,3.49,2.84,10.64h8.36l7.59,12.47-3.61,6.62,8.41,6.7,4.99-5.12,3.41,1.5,7.59,3.61,5.36-3.86c-4.98-1.26-8.87-3.08-11.57-4.59-3.16-1.76-7.15-4.04-10.92-8.53-3.83-4.55-5.42-8.98-5.93-10.52-1.8-5.47-1.6-9.97-1.46-12.47.27-4.96,1.49-8.99,2.6-11.78.91-2.17,2.33-4.93,4.55-7.8,2.88-3.71,5.98-6.14,8.24-7.63,2.34-1.47,5.69-3.25,9.99-4.51,3.95-1.16,7.44-1.51,10.07-1.58,2.84,0,6.83.32,11.37,1.71,4.08,1.24,7.28,2.95,9.54,4.39,1.98,1.37,4.68,3.55,7.23,6.82,2.61,3.36,4.08,6.6,4.91,8.89l11.94,8.36Z"/><polygon class="cls-3" points="29.01 37.92 29.21 67.77 48.09 67.77 48.09 62.29 35.38 62.29 35.3 56.12 45.65 56.12 45.65 49.9 35.3 49.9 35.3 43.97 47.6 43.97 47.68 37.92 29.01 37.92"/><path class="cls-2" d="M50.2,37.92l7.9-.77v24.85h12.51c-.7,2.67-1.7,4.73-2.54,6.17-1.1,1.88-2.2,3.15-3.3,4.44-1.63,1.89-3.23,3.43-4.66,4.66l-6.66,4.33c1.16-1.36,2.46-3.16,3.63-5.41.73-1.41,1.27-2.75,1.68-3.95.66-.95.66-2.17.03-3-.69-.92-1.83-.95-1.98-.95h-6.6v-30.36Z"/><path class="cls-8" d="M39.48,79.33c1.17-.77,2.8-2.03,4.33-3.95,1.63-2.05,2.5-4.05,2.98-5.41h9.91c-.02.87-.14,2.19-.65,3.68-.67,1.98-1.68,3.27-2.54,4.39-.71.91-1.78,2.13-3.3,3.36-1.36.1-3.17.1-5.25-.27-2.31-.41-4.16-1.15-5.47-1.79Z"/><path class="cls-7" d="M52.58,36.23l7.82-.87-2.19-9.37h2.19v-.92l-3.33-.43c-.25-.16-1.41-.84-2.92-.54-1.33.26-2.1,1.12-2.31,1.38-.15.43-.34,1.07-.45,1.86-.19,1.4.03,2.45.27,4.05.19,1.27.48,2.91.92,4.83Z"/><path class="cls-1" d="M33.96,95.49l8.39-.6,8.16-4.76-5.4,4.44,6.23-.43,7.31-4.8-4.39,4.26,5.31-.65,6.6-4.33-4.11,3.79,5.25-1.14,5.09-3.41-2.33,2.54c2.6-.65,6.04-1.79,9.75-3.9,1.88-1.07,4.92-3.01,8.07-6.12.62-.62,2.97-2.98,5.36-6.6,1.24-1.89,2.22-3.37,3.09-5.63,1.54-4.02,1.53-7.39,1.52-8.34-.05-2.59-.57-4.79-1.14-6.44-1.24-2-2.73-4.09-4.55-6.17-7.49-8.6-16.54-12.66-22.41-14.62l-2.65-1.06,2.19-.41-1.3-5.85c-.21-.41-.42-.83-.63-1.24-.81-.95-2.06-1.39-3.22-1.12-1.38.32-2.42,1.59-2.49,3.09-.01.1-.02.2-.04.31.38,2.03.77,4.07,1.15,6.1l.93,3.82c1.29,1.52,2.65,3.29,3.98,5.32,1.9,2.9,3.3,5.66,4.34,8.08.55,1.18,1.15,2.79,1.5,4.75.46,2.57.31,4.76.08,6.25-.15,1.51-.49,3.4-1.22,5.48-1.2,3.42-2.89,5.68-3.98,7.11-1.14,1.49-2.87,3.48-5.36,5.44-2.11,1.41-4.22,2.82-6.33,4.22-1.13.77-2.78,1.71-4.91,2.36-1.39.42-2.66.61-3.7.69l-14.13,9.56Z"/><polygon class="cls-7" points="69.04 24.11 70.61 30.5 78.42 35.54 73.73 29.08 70.26 26.16 69.04 24.11"/><path class="cls-5" d="M67.98,32.63l2.38.79,2.63,3.87,2.36,4.74,14.02,6.5,4.47,3.71c-1.87-.9-4.19-1.84-6.93-2.57-3.46-.92-6.55-1.23-8.99-1.3.34,1.28.65,2.85.78,4.66.16,2.21.01,4.12-.22,5.63-.26,1.53-.58,3.14-.97,4.81-.32,1.38-.67,2.69-1.03,3.93-1.34,4.07-3.18,6.87-4.47,8.53-1.64,2.11-3.4,3.72-4.22,4.47-1.26,1.14-2.41,2.03-3.3,2.68l-4.22,2.57,6.66-5.85c1.24-1.34,2.58-2.94,3.9-4.82,1.62-2.32,2.85-4.54,3.77-6.48,1.08-2.83,1.68-5.31,2.03-7.17.48-2.58.96-5.15.57-8.48-.3-2.56-1.01-4.61-1.6-5.98-.4-2-1.19-4.81-2.84-7.85-1.56-2.88-3.36-4.98-4.76-6.39Z"/><path class="cls-7" d="M38.55,78.93c-1.54-.73-3.54-1.85-5.6-3.57-2.06-1.72-3.52-3.48-4.51-4.87-1.23-1.27-2.95-3.35-4.3-6.29-1.24-2.69-1.57-4.94-1.95-6.86-.43-2.14-.83-5.45-.24-9.42.62-4.21,2.08-7.42,3.17-9.38,1.18-2.12,2.94-4.67,5.56-7.07,3.12-2.86,6.09-4.25,7.88-5.08,1.56-.72,4.22-1.92,7.96-2.48,1.84-.27,3.42-.31,4.59-.28l1.46-1.02c1.25,0,2.69.07,4.26.3,1.33.19,2.54.46,3.59.75l2.91-2.15-4.91-1.91c-1.95-.51-4.66-1.01-7.89-.97-3.24.03-5.94.59-7.89,1.14-3.59.72-6.27,1.99-7.98,2.96-2.66,1.52-4.41,3.14-5.85,4.47-2.71,2.51-4.32,4.71-4.67,5.2-1.7,2.35-2.64,4.32-2.84,4.75-1.16,2.45-1.77,4.68-2.11,6.37-.25,1.42-.52,3.35-.63,5.64-.11,2.3-.19,4.3.26,6.86.49,2.77,1.34,4.74,2.31,6.98.78,1.79,1.52,3.5,2.92,5.52,1.54,2.23,3.17,3.8,4.36,4.81.97,1,2.42,2.29,4.41,3.43,2.22,1.26,4.28,1.86,5.73,2.15Z"/><circle class="cls-6" cx="54.87" cy="27.44" r="1.95"/><circle class="cls-4" cx="54.87" cy="27.44" r=".76"/><circle class="cls-6" cx="64.91" cy="26.01" r="1.95"/><path class="cls-4" d="M65.68,26.01c0,.42-.34.76-.76.76s-.76-.34-.76-.76.34-.76.76-.76.76.34.76.76Z"/><circle class="cls-5" cx="67.59" cy="35.54" r="1.24"/></g></svg>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="hero-dot"></span>
+      Agent IA · Planning BTP
+    </div>
+    <h1 class="hero-title">Gérez votre planning<br><span>en langage naturel</span></h1>
+    <p class="hero-desc">Attribuez du matériel, signalez une panne, libérez un créneau ou créez un nouvel onglet mensuel — en une simple phrase.</p>
+    <div class="hero-tags">
+      <span>📅 Réservation</span>
+      <span>🔧 Panne</span>
+      <span>🗓️ Libération</span>
+      <span>➕ Nouveau mois</span>
+    </div>
+  </div>
+  <span class="version-tag">v1.0</span>
+</div>
+
+
+<div class="app">
+  <div class="header">
+    <div class="agent-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path d="M8 2v4M16 2v4M3 10h18"/>
+        <path d="M8 14h.01M12 14h.01M16 14h.01"/>
+      </svg>
+    </div>
+    <div class="header-info">
+      <div class="header-title">
+        Agent Planning
+        <span class="ia-badge">IA</span>
+      </div>
+      <div class="header-sub">Attribution matériel BTP · Planning location</div>
+    </div>
+    <div class="status-pill">
+      <div class="pulse"></div>
+      En ligne
+    </div>
+  </div>
+
+  <div class="rule-banner">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><circle cx="8" cy="8" r="7"/><path d="M8 5v4M8 11v.5"/></svg>
+    Commandes :
+    <code>louer</code><code>panne</code><code>libérer</code><code>créer feuille</code>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="day-divider">Aujourd'hui</div>
+    <div class="msg bot">
+      <div class="msg-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </div>
+      <div class="msg-content">
+        <div class="bubble">Bonjour ! Je gère le planning de location du matériel BTP. Décrivez votre demande en langage naturel — attribution, panne, libération ou création d'un nouvel onglet mensuel.</div>
+        <div class="timestamp" id="init-time"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="examples">
+    <div class="ex-label">→ Exemples rapides</div>
+    <button class="ex-btn" onclick="fillExample('Parc 9 loué à NOM du 01 au 15 avril')">Réservation</button>
+    <button class="ex-btn" onclick="fillExample('Parc 9 en panne du 01 au 05 avril')">Panne</button>
+    <button class="ex-btn" onclick="fillExample('Libère le Parc 9 du 10 au 15 avril')">Libération</button>
+    <button class="ex-btn" onclick="fillExample('Crée la feuille MAI')">Nouveau mois</button>
+  </div>
+
+  <div class="input-area">
+    <textarea id="msg-input" placeholder="Ex: Parc 9 loué à NOM du 01 au 15 avril..." rows="1"></textarea>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+const WEBHOOK_URL = 'https://ribo67.app.n8n.cloud/webhook/planning-update';
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('msg-input');
+const sendBtn = document.getElementById('send-btn');
+
+function now() { return new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+document.getElementById('init-time').textContent = now();
+
+const botIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
+
+function addMessage(html, type, style='') {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + type;
+  if (type === 'bot') {
+    wrap.innerHTML = `<div class="msg-icon">${botIcon}</div><div class="msg-content"><div class="bubble ${style}">${html}</div><div class="timestamp">${now()}</div></div>`;
+  } else {
+    wrap.innerHTML = `<div class="msg-content"><div class="bubble">${html}</div><div class="timestamp">${now()}</div></div>`;
+  }
+  messagesEl.appendChild(wrap);
+  scrollBottom();
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className='msg bot'; div.id='typing';
+  div.innerHTML=`<div class="msg-icon">${botIcon}</div><div class="msg-content"><div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
+  messagesEl.appendChild(div); scrollBottom();
+}
+function removeTyping() { document.getElementById('typing')?.remove(); }
+function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function fillExample(text) {
+  inputEl.value = text;
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight,110)+'px';
+  inputEl.focus();
+}
+
+// Détection action
+function detectAction(text) {
+  const t = text.toLowerCase();
+  if (t.includes('panne')) return 'panne';
+  if (t.includes('libère') || t.includes('libere') || t.includes('annule') || t.includes('vide')) return 'liberer';
+  if (t.includes('crée') || t.includes('cree') || t.includes('feuille') || t.includes('mois')) return 'creer_feuille';
+  return 'reserver';
+}
+
+// Extraction numéro de parc
+function extractNbParc(text) {
+  return (text.match(/(?:parc|n[°o]|numéro?)\s*:?\s*(\d+)/i)
+       || text.match(/\bparc\s*(\d+)\b/i))?.[1] || null;
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  const action = detectAction(text);
+
+  // Vérif numéro de parc sauf pour creer_feuille
+  if (action !== 'creer_feuille') {
+    const nbParc = extractNbParc(text);
+    if (!nbParc) {
+      addMessage(
+        'Numéro de parc non détecté. Précisez-le dans votre message.<br><span style="opacity:.7;font-size:12px;">Exemple : <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">Parc 9 loué à KANAT du 01 au 15 avril</code></span>',
+        'bot', 'error');
+      return;
+    }
+  }
+
+  addMessage(text, 'user');
+  inputEl.value = ''; inputEl.style.height = '42px';
+  sendBtn.disabled = true;
+  showTyping();
+
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    removeTyping();
+
+    if (res.ok) {
+      const msgs = {
+        reserver: '✓ Réservation enregistrée dans le planning.',
+        panne: '✓ Panne signalée dans le planning.',
+        liberer: '✓ Créneau libéré dans le planning.',
+        creer_feuille: '✓ Nouvel onglet mensuel créé dans le planning.'
+      };
+      addMessage(msgs[action] || '✓ Planning mis à jour.', 'bot', 'success');
+    } else if (res.status >= 500) {
+      addMessage(`Erreur serveur n8n (${res.status}). Vérifiez que le workflow est actif.`, 'bot', 'error');
+    } else {
+      addMessage(`Erreur inattendue (${res.status}). Réessayez.`, 'bot', 'error');
+    }
+  } catch(err) {
+    removeTyping();
+    addMessage('Impossible de joindre le serveur. Vérifiez votre connexion.', 'bot', 'error');
+  }
+
+  sendBtn.disabled = false;
+  inputEl.focus();
+}
+
+inputEl.addEventListener('keydown', e => {
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}
+});
+inputEl.addEventListener('input', function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,110)+'px';
+});
+</script>
+</body>
+</html>
